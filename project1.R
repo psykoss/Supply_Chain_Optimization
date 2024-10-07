@@ -84,6 +84,7 @@ preprocessing_pipeline <- function(data) {
   
   return(data)
 }
+# Apply preprocessing pipeline 
 data.clean <- preprocessing_pipeline(data)
 # ============NA imputation====================#
 # Plot missing values
@@ -99,7 +100,6 @@ na.data.plt
 
 # DBSCAN (extra)
 
-# Apply preprocessing pipeline 
 
 #=================EDA=============================#
 
@@ -185,6 +185,10 @@ ggplot(order_data, aes(x = Date.Order, y = TotalOrders)) +
   labs(x = "Date", y = "Total Orders", title = "Evolution of Orders Over Time") +
   scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "1 month") +  
   theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
+#________________CORRELATION_ANALYSIS_____________#
+plot_correlation(data.clean, maxcat = 9L)
+
 
 
 
