@@ -1,0 +1,9 @@
+"","numeric_columns","skewness"
+"1","Sales",2.88422508236873
+"2","Sales.per.customer",2.88842205579438
+"3","Benefit.per.order",-4.74179466849726
+"4","Product.Price",3.19099305476191
+"5","Order.Item.Discount",3.03977025495952
+"6","Order.Item.Product.Price",3.19099305476191
+"7","Order.Item.Profit.Ratio",-2.89350729763283
+"8","Order.Item.Total",2.88842205579438

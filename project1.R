@@ -1,10 +1,5 @@
-install.packages("tidyverse",
-                 "leaflet",
-                 "plotly",
-                 "ggthemes",
-                 "naniar",
-                 "DataExplorer")
-
+install.packages(c("moments", "tidyverse", "ggplot2", "rnaturalearth", "rnaturalearthdata", "caTools", "leaflet", "ggthemes", "plotly", "DataExplorer", "naniar", "ggpubr"))
+library(moments)
 library(tidyverse)
 library(ggplot2)
 library(rnaturalearth)
@@ -15,6 +10,10 @@ library(ggthemes)
 library(plotly)
 library(DataExplorer)
 library(naniar)
+library(ggpubr)
+library(dplyr)
+
+set.seed(1111)
 
 # Load the data
 data <- read.csv("dataco/DataCoSupplyChainDataset.csv")
@@ -88,23 +87,248 @@ preprocessing_pipeline <- function(data) {
 data.clean <- preprocessing_pipeline(data)
 # ============NA imputation====================#
 # Plot missing values
-na.data.plt.before <- gg_miss_var(data)
-na.data.plt.after <- gg_miss_var(data.clean)
-na.data.plt
+plot_missing(data)
+plot_missing(data)
 # ===============Outlier detection====================#
 # Histograms
+# Plots distributions
+calc_stats <- function(column) {
+  c(
+    min = min(column, na.rm = TRUE),
+    Q1 = quantile(column, 0.25, na.rm = TRUE),
+    median = median(column, na.rm = TRUE),
+    mean = mean(column, na.rm = TRUE),
+    Q3 = quantile(column, 0.75, na.rm = TRUE),
+    max = max(column, na.rm = TRUE)
+  )
+}
+
+# Define stats for each variable
+sales_stats <- calc_stats(data.clean$Sales)
+benefit_stats <- calc_stats(data.clean$Benefit.per.order)
+discount_stats <- calc_stats(data.clean$Order.Item.Discount)
+price_stats <- calc_stats(data.clean$Order.Item.Product.Price)
+total_stats <- calc_stats(data.clean$Order.Item.Total)
+profit_stats <- calc_stats(data.clean$Order.Profit.Per.Order)
+product_price_stats <- calc_stats(data.clean$Product.Price)
+sales_per_customer_stats <- calc_stats(data.clean$Sales.per.customer)
+# Create a custom color palette
+color_palette <- c("min" = "red", "Q1" = "orange", "median" = "green", "mean" = "blue", "Q3" = "purple", "max" = "black")
+
+calc_stats <- function(column) {
+  c(
+    min = min(column, na.rm = TRUE),
+    Q1 = quantile(column, 0.25, na.rm = TRUE),
+    median = median(column, na.rm = TRUE),
+    mean = mean(column, na.rm = TRUE),
+    Q3 = quantile(column, 0.75, na.rm = TRUE),
+    max = max(column, na.rm = TRUE)
+  )
+}
+
+# Define stats for each variable
+sales_stats <- calc_stats(data.clean$Sales)
+benefit_stats <- calc_stats(data.clean$Benefit.per.order)
+discount_stats <- calc_stats(data.clean$Order.Item.Discount)
+price_stats <- calc_stats(data.clean$Order.Item.Product.Price)
+total_stats <- calc_stats(data.clean$Order.Item.Total)
+profit_stats <- calc_stats(data.clean$Order.Profit.Per.Order)
+product_price_stats <- calc_stats(data.clean$Product.Price)
+sales_per_customer_stats <- calc_stats(data.clean$Sales.per.customer)
+
+# Create a custom color palette
+color_palette <- c("min" = "red", "Q1" = "orange", "median" = "green", "mean" = "blue", "Q3" = "purple", "max" = "black")
+create_plot <- function(data, x_var, title) {
+  stats <- calc_stats(data[[x_var]])
+  
+  ggplot(data, aes_string(x = x_var)) + 
+    geom_histogram(aes(y = ..density..), fill = "white", color = "black") +
+    geom_density(alpha = .4, fill = "#000000", bw = 100) +
+    geom_vline(xintercept = stats[1], linetype = "dashed", color = color_palette["min"], size = 1, show.legend = TRUE) + 
+    geom_vline(xintercept = stats[2], linetype = "dashed", color = color_palette["Q1"], size = 1, show.legend = TRUE) + 
+    geom_vline(xintercept = stats[3], linetype = "dashed", color = color_palette["median"], size = 1, show.legend = TRUE) + 
+    geom_vline(xintercept = stats[4], linetype = "dashed", color = color_palette["mean"], size = 1, show.legend = TRUE) + 
+    geom_vline(xintercept = stats[5], linetype = "dashed", color = color_palette["Q3"], size = 1, show.legend = TRUE) + 
+    geom_vline(xintercept = stats[6], linetype = "dashed", color = color_palette["max"], size = 1, show.legend = TRUE) +
+    theme_clean() + 
+    ggtitle(title) +
+    xlab(title) + 
+    ylab("Density")
+}
+# Create plots for each variable
+plt1 <- create_plot(data.clean, "Sales", "Sales")
+plt2 <- create_plot(data.clean, "Benefit.per.order", "Benefit Per Order")
+plt3 <- create_plot(data.clean, "Order.Item.Discount", "Discount per Order (%)")
+plt4 <- create_plot(data.clean, "Order.Item.Product.Price", "Price of item per Order")
+plt5 <- create_plot(data.clean, "Order.Item.Total", "Order Item Total")
+plt6 <- create_plot(data.clean, "Order.Profit.Per.Order", "Profit per order")
+plt7 <- create_plot(data.clean, "Product.Price", "Product Price")
+plt8 <- create_plot(data.clean, "Sales.per.customer", "Sales per Customer")
+
+# Create a legend manually
+legend_data <- data.frame(
+  Statistic = c("min", "Q1", "median", "mean", "Q3", "max"),
+  Color = c("red", "orange", "green", "blue", "purple", "black")
+)
+
+legend_plot <- ggplot(legend_data, aes(x = Statistic, y = 1, fill = Statistic)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = color_palette) +
+  theme_void() +
+  theme(legend.position = "bottom") +
+  labs(fill = "Statistics") +
+  guides(fill = guide_legend(title = "Statistics"))
+
+# Arrange all plots including the legend
+combined_plot <- ggarrange(plt1, plt2, plt3, plt4, plt5, plt6, plt7, plt8, nrow = 4, ncol = 2, common.legend = FALSE, legend = "right")
+
+# Add the legend plot below the combined plots
+final_plot <- ggarrange(combined_plot, legend_plot, ncol = 1, heights = c(7.8, 0.5))
+
+# Display the final plot
+print(final_plot)
+
+
+
+# Skewness table
+
+numeric.cols <- c("Sales",
+                  "Sales.per.customer",
+                  "Benefit.per.order",
+                  "Product.Price",
+                  "Order.Item.Discount",
+                  "Order.Item.Product.Price",
+                  "Order.Item.Profit.Ratio",
+                  "Order.Item.Total")
+
+sk1 <- skewness(data.clean$Sales)
+sk2 <- skewness(data.clean$Sales.per.customer)
+sk3 <- skewness(data.clean$Benefit.per.order)
+sk4 <- skewness(data.clean$Product.Price)
+sk5 <- skewness(data.clean$Order.Item.Discount)
+sk6 <- skewness(data.clean$Order.Item.Product.Price)
+sk7 <- skewness(data.clean$Order.Item.Profit.Ratio)
+sk8 <- skewness(data.clean$Order.Item.Total)
+
+skews <- c(sk1,sk2,sk3,sk4,sk5,sk6,sk7,sk8)
+
+skewness.df <- data.frame(numeric_columns = numeric.cols, skewness = skews)
+write.csv(skewness.df, "skewness.csv")
+
+# Boxplots
+bxplt.1 <- ggplot(data.clean, aes(x = Sales)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 3) +
+  labs(title = "BoxPlot of Sales",x = "Number of Sales") + 
+  theme_clean() +
+  theme(
+    plot.title = element_text(size = 20, face = "bold")  
+  )
+bxplt.2 <- ggplot(data.clean, aes(x = Sales.per.customer)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 3) +
+  labs(title = "BoxPlot of Sales per customer",x = "Number of Sales per customer") + 
+  theme_clean() +
+  theme(
+    plot.title = element_text(size = 20, face = "bold")  
+  )
+
+bxplt.3 <- ggplot(data.clean, aes(x = Product.Price)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 3) +
+  labs(title = "BoxPlot of Product Price", x = "Price ($)") + 
+  theme_clean() +
+  theme(
+    plot.title = element_text(size = 20, face = "bold")  
+  )
+
+bxplt.4 <- ggplot(data.clean, aes(x = Benefit.per.order)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 3) +
+  labs(title = "BoxPlot of Benefit per order", x = "Benefit ($)") + 
+  theme_clean() +
+  theme(
+    plot.title = element_text(size = 20, face = "bold")  
+  )
+
+bxplt.5 <- ggplot(data.clean, aes(x = Order.Item.Discount)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 3) +
+  labs(title = "BoxPlot of Order Item Discount", x = "Discount ($)") + 
+  theme_clean() +
+  theme(
+    plot.title = element_text(size = 20, face = "bold")  
+  )
+bxplt.6 <- ggplot(data.clean, aes(x = Order.Item.Profit.Ratio)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 3) +
+  labs(title = "BoxPlot of Profit Ratio",  x = "Profit Ratio (%)") + 
+  theme_clean() +
+  theme(
+    plot.title = element_text(size = 20, face = "bold")  
+  )
+bxplt.7 <- ggplot(data.clean, aes(x = Order.Item.Total)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 3) +
+  labs(title = "BoxPlot of Total Amount per Order",x = "Number of Orders") + 
+  theme_clean() +
+  theme(
+    plot.title = element_text(size = 20, face = "bold")  
+  )
+bxplt.8 <- ggplot(data.clean, aes(x = Order.Item.Product.Price)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 3) +
+  labs(title = "BoxPlot of Product Price (Without discount)", x = "Price ($)") + 
+  theme_clean() +
+  theme(
+    plot.title = element_text(size = 20, face = "bold")  
+  )
+
+
+ggarrange(bxplt.1,bxplt.2,bxplt.3,bxplt.4,bxplt.5,bxplt.6,bxplt.7,bxplt.8,
+          nrow = 4, ncol = 2)
+
+# Number of outliers using IQR
+
+outliers_count_iqr <- data.clean %>%
+  select(numeric.cols) %>%  
+  summarise(across(everything(), ~ {
+    Q1 <- quantile(.x, 0.25)
+    Q3 <- quantile(.x, 0.75)
+    IQR <- Q3 - Q1
+    sum(.x < (Q1 - 1 * IQR) | .x > (Q3 + 1 * IQR))  
+  }, .names = "outliers_{col}")) 
+write_csv(outliers_count_iqr, "outliers_iqr.csv")
+
 
 # 3-Sigma-Rule
+outliers_count_sigma <- data.clean %>%
+  select(numeric.cols) %>%  
+  summarise(across(everything(), ~ {
+    mu <- mean(.x)
+    sigma <- sd(.x)
+    sum(.x < mu - 3*sigma | .x > mu + 3*sigma)
+      }, .names = "outliers_{col}")) 
+write_csv(outliers_count_sigma, "outliers_sigma.csv")
 
-# Normalization
-
+# Get outliers position 
+outliers_pos <- function(data, numeric.cols) {
+  outliers_list <- data %>%
+    select(all_of(numeric.cols)) %>%
+    map(~ {
+      mu <- mean(.x)
+      sigma <- sd(.x)
+      which(.x < mu - 3 * sigma | .x > mu + 3 * sigma)  
+    }) %>%
+    unlist() %>%
+    unique()
+  
+  return(outliers_list)
+}
+outliers_position <- outliers_pos(data.clean, numeric.cols)
+# Remove outliers
+# data.clean <- data.clean[-outliers_position,]
 # DBSCAN (extra)
+
+
 
 
 #=================EDA=============================#
 
 #________________REPORT___________________________#
-create_report(data.clean)
+#create_report(data.clean)
 
 #______________ORDERS_PER_COUNTRY_________________#
 
@@ -126,7 +350,6 @@ ggplot(top_countries, aes(x = reorder(Order.Country, TotalOrders), y = TotalOrde
   coord_flip()
 
 #_____________ORDERS_PER_MARKET___________________#
-library(leaflet) 
 
 # Add approximate coordinates for each market
 orders_market <- data %>%
@@ -153,7 +376,6 @@ orders_market <- data %>%
 palette <- c("Africa" = "red", "Europe" = "green", "LATAM" = "blue", 
              "Pacific Asia" = "purple", "USCA" = "orange")
 
-library(rnaturalearth)
 world_map <- map_data("world")
 
 # Plot the map
@@ -161,7 +383,7 @@ ggplot() +
   geom_polygon(data = world_map, aes(x = long, y = lat, group = group), 
                fill = "lightgray", color = "black") +  
   geom_point(data = orders_market, aes(x = lon, y = lat, color = Market, size = TotalOrders),
-             alpha = 0.7, show.legend = FALSE) +  
+             alpha = 0.7, show.legend = TRUE) +  
   scale_color_manual(values = palette) +  
   scale_size_continuous(range = c(5, 20)) +  
   geom_text(data = orders_market, aes(x = lon, y = lat, label = TotalOrders),
@@ -184,11 +406,63 @@ ggplot(order_data, aes(x = Date.Order, y = TotalOrders)) +
   theme_clean() +                                
   labs(x = "Date", y = "Total Orders", title = "Evolution of Orders Over Time") +
   scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "1 month") +  
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 #________________CORRELATION_ANALYSIS_____________#
 plot_correlation(data.clean, maxcat = 9L)
 
 
+# Objective: Correct skewed distributions
+# 1. Benefit per order
+# 2. Order Item Discount
+# 3. Order Item Product Price
+# 4. Order item Profit Ratio
+# 5. Order item Total
+# 6. Order profit per order
+# 7. Product price 
+# 8. Sales
+# 9. Sales per costumer
+
+# Solutions:
+# 1. Remove outliers
+# 3. Transformations (log, exp, ...)
+
+# Box Cox
+#bc <- boxcox(data.clean$Sales ~ 1)  
+#lambda <- bc$x[which.max(bc$y)]     
+#data.clean$Sales_boxcox <- (data.clean$Sales^lambda - 1) / lambda
+
+# Yeo_Johnson
+library(bestNormalize)
+yj <- yeojohnson(data.num$Order.Item.Total)
+data.num$Order.Item.Total <- yj$x.t  
 
 
+# QQ-Plot
+
+#=======================UNSUPERVISED_LEARNING=========================#
+library(factoextra)
+
+data.num <- data.clean %>%
+  select(numeric.cols)
+
+pca <- prcomp(data.num, scale = T)
+fviz_eig(pca, addlabels=TRUE, hjust = -0.3,
+         linecolor ="red") + theme_minimal()
+
+
+biplot <- fviz_pca_biplot(pca, 
+                          label = "var",       
+                          repel = TRUE,        
+                          geom.ind = "point",  
+                          alpha.ind = 0.2,     
+                          pointsize = 0.9)
+
+fviz_contrib(pca, choice = "ind", axes = 1, top=100)
+
+
+
+data.frame(z1=-pca$x[,1],z2=pca$x[,2]) %>% 
+  ggplot(aes(z1,z2,label=data[-outliers_position,]$Category.Name,color=data.clean$Sales)) + geom_point(size=0.7, alpha =.6) +
+  labs(title="PCA", x="PC1", y="PC2") +
+  theme_bw() + scale_color_gradient(low="lightblue", high="blue")+theme(legend.position="bottom") + geom_text(size=4, hjust=0.6, vjust=0, check_overlap = TRUE, color = "black") 
