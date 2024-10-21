@@ -1,2 +1,2 @@
-outliers_Sales,outliers_Sales.per.customer,outliers_Benefit.per.order,outliers_Product.Price,outliers_Order.Item.Discount,outliers_Order.Item.Product.Price,outliers_Order.Item.Profit.Ratio,outliers_Order.Item.Total
-488,1943,18942,2048,7537,2048,17300,1943
+outliers_Sales,outliers_Sales.per.customer,outliers_Benefit.per.order,outliers_Product.Price,outliers_Order.Item.Discount,outliers_Order.Item.Product.Price,outliers_Order.Item.Profit.Ratio,outliers_Order.Item.Total,outliers_Order.Profit.Per.Order
+3523,7487,29678,20132,12427,20132,22373,7487,29678

@@ -85,12 +85,11 @@ preprocessing_pipeline <- function(data) {
 }
 # Apply preprocessing pipeline 
 data.clean <- preprocessing_pipeline(data)
-# ============NA imputation====================#
+# ============NA imputation===========================================================================================================================#
 # Plot missing values
 plot_missing(data)
 plot_missing(data)
-# ===============Outlier detection====================#
-# Histograms
+# ===============Outlier detection====================================================================================================================#
 # Plots distributions
 calc_stats <- function(column) {
   c(
@@ -188,17 +187,39 @@ final_plot <- ggarrange(combined_plot, legend_plot, ncol = 1, heights = c(7.8, 0
 # Display the final plot
 print(final_plot)
 
+# Plot discrete features
+create_plot_cat <- function(data, x_var, title, xlab) {
+  ggplot(data, aes_string(x = x_var, fill = x_var)) + 
+    geom_bar(color = "black") +  # Outline bars with black color
+    theme_clean() + 
+    ggtitle(title) +
+    xlab(NULL) +
+    scale_fill_discrete(name = x_var)+  # Optional: Legend with x_var name
+    theme(
+      legend.position = "none",  # Remove legend
+      axis.text.x = element_text(angle = 45, hjust = 1)  # Optional: Tilt X-axis text
+    )  
+}
 
+plt.cat1 <- create_plot_cat(data.clean, "Type", "Distribution of payment types", "Types")
+plt.cat2 <- create_plot_cat(data.clean, "Order.Status", "Status of Order", "Status")
+plt.cat3 <- create_plot_cat(data.clean, "Late_delivery_risk", "Risk of late Delivery", "Risk")
+plt.cat4 <- create_plot_cat(data.clean, "Delivery.Status", "Status of Delivery", "Status")
+plt.cat5 <- create_plot_cat(data.clean, "Shipping.Mode", "Shipment Types", "Types")
+
+
+combined_plot_cat <- ggarrange(plt.cat1,plt.cat2,plt.cat3,plt.cat4,plt.cat5, nrow = 3, ncol = 2)
 
 # Skewness table
 
-numeric.cols <- c("Sales",
+skew.numeric.cols <- c("Sales",
                   "Sales.per.customer",
                   "Benefit.per.order",
                   "Product.Price",
                   "Order.Item.Discount",
                   "Order.Item.Product.Price",
                   "Order.Item.Profit.Ratio",
+                  "Order.Profit.Per.Order",
                   "Order.Item.Total")
 
 sk1 <- skewness(data.clean$Sales)
@@ -208,11 +229,11 @@ sk4 <- skewness(data.clean$Product.Price)
 sk5 <- skewness(data.clean$Order.Item.Discount)
 sk6 <- skewness(data.clean$Order.Item.Product.Price)
 sk7 <- skewness(data.clean$Order.Item.Profit.Ratio)
-sk8 <- skewness(data.clean$Order.Item.Total)
+sk8 <- skewness(data.clean$Order.Profit.Per.Order)
+sk9 <- skewness(data.clean$Order.Item.Total)
+skews <- c(sk1,sk2,sk3,sk4,sk5,sk6,sk7,sk8,sk9)
 
-skews <- c(sk1,sk2,sk3,sk4,sk5,sk6,sk7,sk8)
-
-skewness.df <- data.frame(numeric_columns = numeric.cols, skewness = skews)
+skewness.df <- data.frame(numeric_columns = skew.numeric.cols, skewness = skews)
 write.csv(skewness.df, "skewness.csv")
 
 # Boxplots
@@ -320,12 +341,19 @@ outliers_pos <- function(data, numeric.cols) {
 outliers_position <- outliers_pos(data.clean, numeric.cols)
 # Remove outliers
 # data.clean <- data.clean[-outliers_position,]
+
+
 # DBSCAN (extra)
 
+library(dbscan)
 
+dbscan_result <- dbscan(data.num, eps = 10, minPts = 8)
 
+labels <- dbscan_result$cluster
 
-#=================EDA=============================#
+dbscan_result
+
+#=================EDA============================================================================================================================#
 
 #________________REPORT___________________________#
 #create_report(data.clean)
@@ -381,7 +409,7 @@ world_map <- map_data("world")
 # Plot the map
 ggplot() +
   geom_polygon(data = world_map, aes(x = long, y = lat, group = group), 
-               fill = "lightgray", color = "black") +  
+               fill = "white", color = "black") +  
   geom_point(data = orders_market, aes(x = lon, y = lat, color = Market, size = TotalOrders),
              alpha = 0.7, show.legend = TRUE) +  
   scale_color_manual(values = palette) +  
@@ -391,6 +419,40 @@ ggplot() +
   theme_economist_white() +
   theme(legend.position = "left") +
   labs(title = "Total Orders by Market", color = "Market", size = "Total Orders")
+
+
+benefit_order_market <- data %>%
+  group_by(Market) %>%
+  summarise(TotalBenefit = sum(Benefit.per.order)) %>%
+  mutate(
+    lat = case_when(
+      Market == "Africa" ~ 1.9577,        
+      Market == "Europe" ~ 54.5260,       
+      Market == "LATAM" ~ -14.2350,       
+      Market == "Pacific Asia" ~ 1.3521,  
+      Market == "USCA" ~ 37.0902         
+    ),
+    lon = case_when(
+      Market == "Africa" ~ 17.3592,
+      Market == "Europe" ~ 15.2551,
+      Market == "LATAM" ~ -51.9253,
+      Market == "Pacific Asia" ~ 103.8198,
+      Market == "USCA" ~ -95.7129
+    )
+  )
+ggplot() +
+  geom_polygon(data = world_map, aes(x = long, y = lat, group = group), 
+               fill = "white", color = "black") +  
+  geom_point(data = benefit_order_market, aes(x = lon, y = lat, color = Market, size = TotalBenefit),
+             alpha = 0.7, show.legend = TRUE) +  
+  scale_color_manual(values = palette) +  
+  scale_size_continuous(range = c(5, 20)) +  
+  geom_text(data = benefit_order_market, aes(x = lon, y = lat, label = scales::scientific(TotalBenefit)),
+            vjust = -1, size = 6, fontface = "bold") +  
+  theme_economist_white() +
+  theme(legend.position = "left") +
+  labs(title = "Total Benefit Orders by Market", color = "Market", size = "Total Benefit ($)")
+
 #____________________ORDER_EVOLUTION______________#
 
 
@@ -400,13 +462,105 @@ order_data <- data %>%
   group_by(Date.Order) %>%                       
   summarise(TotalOrders = n())        
 
-ggplot(order_data, aes(x = Date.Order, y = TotalOrders)) +
+orders_time <- ggplot(order_data, aes(x = Date.Order, y = TotalOrders)) +
   geom_line(color = "blue", size = 1) +           
-  geom_point(color = "red", size = 2) +           
+  geom_point(color = "red", size = 1, alpha = 0.7) +
+  geom_smooth(color = "black", size = 1) +
   theme_clean() +                                
-  labs(x = "Date", y = "Total Orders", title = "Evolution of Orders Over Time") +
+  labs(x = "Date Order", y = "Total Orders", title = "Evolution of Orders per month") +
   scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "1 month") +  
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#_____________________BENEFIT_OVER_TIME______________________________#
+benefit_data <- data %>%
+  mutate(Date.Order = as.Date(as.POSIXct(order.date..DateOrders., format = "%m/%d/%Y %H:%M"))) %>%  
+  group_by(Date.Order) %>%                       
+  summarise(TotalBenefit = sum(Benefit.per.order))
+
+benefit_time <- ggplot(benefit_data, aes(x = Date.Order, y = TotalBenefit)) +
+  geom_line(color = "blue", size = 1) +           
+  geom_point(color = "red", size = 1, alpha = 0.7) +
+  geom_smooth(color = "black", size = 1) +
+  theme_clean() +                                
+  labs(x = "Date Order", y = "Total Benefit", title = "Evolution of Benefit per month") +
+  scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "1 month") +  
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#_____________________sALES_OVER_TIME______________________________#
+sales_time_data <- data %>%
+  mutate(Date.Order = as.Date(as.POSIXct(order.date..DateOrders., format = "%m/%d/%Y %H:%M"))) %>%  
+  group_by(Date.Order) %>%                       
+  summarise(TotalSales = sum(Sales))
+
+sales_time <- ggplot(sales_time_data, aes(x = Date.Order, y = TotalSales)) +
+  geom_line(color = "blue", size = 1) +           
+  geom_point(color = "red", size = 1, alpha = 0.7) +
+  geom_smooth(color = "black", size = 1) +
+  theme_clean() +                                
+  labs(x = "Date Order", y = "Total Sales", title = "Evolution of Sales per month") +
+  scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "1 month") +  
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#_____________________PRICE_OVER_TIME______________________________#
+price_time_data <- data %>%
+  mutate(Date.Order = as.Date(as.POSIXct(order.date..DateOrders., format = "%m/%d/%Y %H:%M"))) %>%  
+  group_by(Date.Order) %>%                       
+  summarise(TotalPrice = sum(Product.Price))
+
+price_time <- ggplot(price_time_data, aes(x = Date.Order, y = TotalPrice)) +
+  geom_line(color = "blue", size = 1) +           
+  geom_point(color = "red", size = 1, alpha = 0.7) +
+  geom_smooth(color = "black", size = 1) +
+  theme_clean() +                                
+  labs(x = "Date Order", y = "Total price", title = "Evolution of price per month") +
+  scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "1 month") +  
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+price_time
+#_____________________QUANTITY_OVER_TIME______________________________#
+quantity_time_data <- data %>%
+  mutate(Date.Order = as.Date(as.POSIXct(order.date..DateOrders., format = "%m/%d/%Y %H:%M"))) %>%  
+  group_by(Date.Order) %>%                       
+  summarise(TotalQuantity = sum(Order.Item.Quantity))
+
+quantity_time <- ggplot(quantity_time_data, aes(x = Date.Order, y = TotalQuantity)) +
+  geom_line(color = "blue", size = 1) +           
+  geom_point(color = "red", size = 1, alpha = 0.7) +
+  geom_smooth(color = "black", size = 1) +
+  theme_clean() +                                
+  labs(x = "Date Order", y = "Total Quantity ordered", title = "Evolution of quantity ordered per month") +
+  scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "1 month") +  
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+quantity_time
+
+
+#_____________________DAYS_TO_SHIP_OVER_TIME______________________________#
+shipping_days_time_data <- data %>%
+  mutate(Shipping.Order = as.Date(as.POSIXct(shipping.date..DateOrders., format = "%m/%d/%Y %H:%M"))) %>%  
+  group_by(Shipping.Order) %>%                       
+  summarise(DaysReal = sum(Days.for.shipping..real.),
+            DaysScheduled = sum(Days.for.shipment..scheduled.)
+            )
+
+# Plotting both time series with points and smooth line
+shippings_time <- ggplot(shipping_days_time_data, aes(x = Shipping.Order)) +
+  geom_line(aes(y = DaysReal, color = "DaysReal"), size = 1) +         # Line for DaysReal
+  geom_line(aes(y = DaysScheduled, color = "DaysScheduled"), size = 1) + # Line for DaysScheduled
+  geom_point(aes(y = DaysReal), color = "black", size = 0.5, alpha = 0.7) +  # Points for DaysReal
+  geom_point(aes(y = DaysScheduled), color = "black", size = 0.5, alpha = 0.7) + # Points for DaysScheduled
+  geom_smooth(aes(y = DaysReal), color = "black", size = 1, se = FALSE) +  # Smoothed line for DaysReal
+  theme_clean() +                                
+  labs(x = "Date Shipment", y = "Total Days Expected VS Total Days Real", title = "Evolution of Total Days Expected VS Total Days Real Shipment") +
+  scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "1 month") +  
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+timeseries_plot <- ggarrange(orders_time,
+                             quantity_time,
+                             price_time,
+                             sales_time,
+                             benefit_time,
+                             shippings_time, nrow = 3, ncol= 2)
 
 #________________CORRELATION_ANALYSIS_____________#
 plot_correlation(data.clean, maxcat = 9L)
@@ -433,18 +587,25 @@ plot_correlation(data.clean, maxcat = 9L)
 #data.clean$Sales_boxcox <- (data.clean$Sales^lambda - 1) / lambda
 
 # Yeo_Johnson
-library(bestNormalize)
-yj <- yeojohnson(data.num$Order.Item.Total)
-data.num$Order.Item.Total <- yj$x.t  
+#library(bestNormalize)
+#yj <- yeojohnson(data.num$Order.Item.Total)
+#data.num$Order.Item.Total <- yj$x.t  
 
 
 # QQ-Plot
 
 #=======================UNSUPERVISED_LEARNING=========================#
 library(factoextra)
-
+numeric.cols <- c("Sales",
+                       "Sales.per.customer",
+                       "Benefit.per.order",
+                       "Product.Price",
+                       "Order.Item.Discount",
+                       "Order.Item.Product.Price",
+                       "Order.Item.Total",
+                       "Order.Profit.Per.Order")
 data.num <- data.clean %>%
-  select(numeric.cols)
+  select(all_of(numeric.cols))
 
 pca <- prcomp(data.num, scale = T)
 fviz_eig(pca, addlabels=TRUE, hjust = -0.3,
@@ -463,6 +624,42 @@ fviz_contrib(pca, choice = "ind", axes = 1, top=100)
 
 
 data.frame(z1=-pca$x[,1],z2=pca$x[,2]) %>% 
-  ggplot(aes(z1,z2,label=data[-outliers_position,]$Category.Name,color=data.clean$Sales)) + geom_point(size=0.7, alpha =.6) +
+  ggplot(aes(z1,z2,label=data$Order.Country,color=data.clean$Product.Price)) + geom_point(size=0.7, alpha =.6) +
   labs(title="PCA", x="PC1", y="PC2") +
   theme_bw() + scale_color_gradient(low="lightblue", high="blue")+theme(legend.position="bottom") + geom_text(size=4, hjust=0.6, vjust=0, check_overlap = TRUE, color = "black") 
+
+
+#__________________________FA___________________________________________#
+
+# Problem of singular matrix is solved through removing the variables that have high correlations (Avoid multicollinearity)
+
+fa <- factanal(data.num, factors = 3, rotation = "varimax", scores = "Bartlett", lower = 0.01)
+
+#______________________CLUSTERING________________________________________#
+library(cluster)
+library(mclust)
+
+#___________KMEANS_____________________________________#
+k = 5
+data.scaled <- scale(data.num)
+fit <- kmeans(data.scaled, centers = k, nstart = 1000)
+
+clus_plot <- fviz_cluster(fit, data = data.scaled, geom = "point") +
+  theme_clean()
+
+wss <- function(k) {
+  kmeans(data.scaled, centers = k, nstart = 10)$tot.withinss
+}
+k_values <- 1:10
+wss_values <- sapply(k_values, wss)
+elbow_df <- data.frame(k = k_values, wss = wss_values)
+
+elbow_plot <- ggplot(elbow_df,aes(x = k, y = wss_values)) + 
+  geom_point() + 
+  geom_line() +
+  geom_vline(xintercept = 5, linetype = "dashed", color = "red", size = 1) +  
+  labs(x = "Number of Clusters", y = "Total Within Cluster Sum of Squares", title = "Elbow Plot Kmeans") +
+  scale_x_continuous(breaks=seq(0, 10, 1)) + 
+  theme_clean()
+
+
